@@ -1,10 +1,12 @@
-#!/usr/bin/env python
+
 import pygame
 from pygame.locals import *
 import pygame.gfxdraw
 import sys
 import time
 from random import randint
+import pandas as pd
+import csv
 
 
 #Setting
@@ -21,21 +23,23 @@ clock = pygame.time.Clock()
 #init
 panel_x = 0
 panel_y = SCREEN_HEIGHT*5.05/6
-panel_width = SCREEN_WIDTH*9/75
+panel_width = SCREEN_WIDTH*9/63
 panel_half_width = panel_width/2
 panel_height = SCREEN_HEIGHT*1/60
 panel_vel = 7
 n_text = 0
 score_start = 0
 
-#Farben
-PANEL_COLOR = (40,30,10)
-BACK_COLOR = (90,150,70)
-BALL_COLOR = (255,0,0)
+# Main colors
+PANEL_COLOR = (40, 30, 10)
+BACK_COLOR = (90, 150, 70)
+BALL_COLOR = (255, 0, 0)
 
-# Schreibkrams
+# Some fonts
 pygame.font.init()  # you have to call this at the start,
 myfont = pygame.font.SysFont('Lobster Two', 30)
+
+#Scores
 score_pos = (SCREEN_WIDTH_Complete*(6.8/8), SCREEN_HEIGHT/3)
 
 # Raspberry Images
@@ -55,22 +59,29 @@ rasperry_image_4.set_colorkey(transColor)
 rasperry_image_4 = pygame.transform.scale(rasperry_image_4,(45,50))
 
 
-def restart():
-    screen.fill(pygame.Color(0, 0, 0))
-    re_image = pygame.image.load("image/Restart.png").convert()
-    re_image = pygame.transform.scale(re_image, (800, 600))
-    screen.blit(re_image, [0, 0])
-    #texts = [("You killed me"), ("I'm... dead"), ("Not again..."), ("Why ?"),
-     #        ("Please let me live"), ("Bye bye")]
-    #tr = random.choice(texts)
-    #text_surface = myfont.render(tr, False, (50, 50, 50))
-    #screen.blit(text_surface, (250, 300))
-    # FOR und BREAK könnte gehen; return
-    key = pygame.key.get_pressed()
+# restart after dying
+def restart(current_score):
+    score(current_score)                                        # Add Score to Highscores
+    screen.fill(pygame.Color(0, 0, 0))                          # Fill background with black
+    re_image = pygame.image.load("image/Restart.png").convert() # Load Restart background
+    re_image = pygame.transform.scale(re_image, (800, 600))     # Transform image to fit in screen
+    screen.blit(re_image, [0, 0])                               # Draw image
+    key = pygame.key.get_pressed()                              # If Space gets pressed -> switch to menu
     if key[K_SPACE]:
         menu()
 
+# restart after winning
+def winscreen(current_score):
+    score(current_score)                                         # Add Score to Highscores
+    screen.fill(pygame.Color(0, 0, 0))                           # Fill background with black
+    re_image = pygame.image.load("image/Background green only.png").convert()   # Load new background
+    re_image = pygame.transform.scale(re_image, (800, 600))      # Transform image to fit in screen
+    screen.blit(re_image, [0, 0])                                # Draw image
+    key = pygame.key.get_pressed()                               # If Space gets pressed -> switch to menu
+    if key[K_SPACE]:
+        menu()
 
+# function: defines how the panel moves
 def panel_move():
     #Define panel movement
     global panel_x
@@ -83,7 +94,7 @@ def panel_move():
         if panel_x >= 0:
             panel_x -= panel_vel
 
-
+# defines features and methods for the ball used
 class Ball:
     def __init__(self, rad = 5.0, pos_x = 150.0, pos_y = 150.0, diam = 10.0, vel_x = 0.0, vel_y = 5.0):
         self.pos_x  = pos_x
@@ -130,7 +141,7 @@ class Ball:
         self.pos_x += self.vel_x
         self.pos_y += self.vel_y
 
-
+# defines features of all Raspberries
 class Rasperry:
 
     def __init__(self, pos_x, pos_y, rad):
@@ -145,7 +156,7 @@ class Rasperry:
     def r_fall(self):
         self.pos_y += 5
 
-
+# defines starting conditions, so that the player doesn't continue the last game
 def starting_phase():
     list_rasp = []
     list_pos_rasp = []
@@ -155,7 +166,7 @@ def starting_phase():
     for i in range(0, 30):
         x = randint(1, 11)
         y = randint(1, 3)
-        if list_pos_rasp.count != (x, y):
+        if (x, y) not in list_pos_rasp:
             list_pos_rasp.append((x, y))
             list_rasp.append(Rasperry(x * 50, y * 75, 20))
 
@@ -193,8 +204,8 @@ def starting_phase():
 
     #Panel and Ball
         panel_move()
-        pygame.draw.rect(screen, PANEL_COLOR, (panel_x, panel_y, panel_width, panel_height), 0)
-        screen.blit(to_image, [panel_x-8, panel_y-5])
+        #pygame.draw.rect(screen, PANEL_COLOR, (panel_x, panel_y, panel_width, panel_height), 0)
+        screen.blit(to_image, [panel_x-5, panel_y-5])
         b1.pos_x = panel_x + panel_half_width
         b1.pos_y = panel_y - 2 * b1.rad
         pygame.draw.circle(screen, BALL_COLOR, (int(b1.pos_x), int(b1.pos_y)), int(b1.diam))
@@ -203,12 +214,12 @@ def starting_phase():
         screen.blit(fg_image, [0, 0])
 
     # Write score
-        score = myfont.render("Score:" + str(score_start), False, (150, 50, 50))
+        score = myfont.render( str(score_start), False, (150, 50, 50))
         screen.blit(score, score_pos)
 
         key = pygame.key.get_pressed()
         if key[K_BACKSPACE]:
-            main_game(b1, list_rasp,rasperry_image)
+            main_game(b1, list_rasp,rasperry_image,score_start)
 
         pygame.display.update()
 
@@ -219,9 +230,150 @@ def starting_phase():
             if event.type == KEYDOWN:
                 if event.key == K_ESCAPE:
                     exit()
+                if event.key == K_q:
+                    exit()
+                if event.key == K_SPACE:
+                    menu()
+
+# Takes over old score and starts next randomized level
+def starting_next_level(score_start):
+    list_rasp = []
+    list_pos_rasp = []
+    b1 = Ball()
+
+# Kreiere Raspberries
+    for i in range(0, 30):
+        x = randint(1, 11)
+        y = randint(1, 3)
+        if (x, y) not in list_pos_rasp:
+            list_pos_rasp.append((x, y))
+            list_rasp.append(Rasperry(x * 50, y * 75, 20))
+
+# Background green
+    bg_image = pygame.image.load("image/Background green only.png").convert()
+    bg_image = pygame.transform.scale(bg_image, (800, 600))
+
+# Foreground face
+    fg_image = pygame.image.load("image/Background face only.png").convert()
+    transColor = fg_image.get_at((0, 0))
+    #transColor = (0, 255, 0)
+    fg_image.set_colorkey(transColor)
+    fg_image = pygame.transform.scale(fg_image, (800, 600))
+
+# Rasperry
+    global rasperry_image
+
+# Tongue
+    to_image = pygame.image.load("image/Zunge.png").convert()
+    to_image.set_colorkey(transColor)
+    to_image = pygame.transform.scale(to_image,(100,80))
 
 
-def main_game(b1, list_rasp,rasperry_image):
+    while True:
+        msElapsed = clock.tick(100)
+        screen.blit(bg_image, [0, 0])
+
+    # Draw Raspberries
+        for i in list_rasp:
+            #pygame.draw.circle(screen, BALL_COLOR, (i.pos_x, i.pos_y), i.rad)
+            screen.blit(rasperry_image, [i.pos_x-25, i.pos_y-30])
+
+
+    #Panel and Ball
+        panel_move()
+        #pygame.draw.rect(screen, PANEL_COLOR, (panel_x, panel_y, panel_width, panel_height), 0)
+        screen.blit(to_image, [panel_x-5, panel_y-5])
+        b1.pos_x = panel_x + panel_half_width
+        b1.pos_y = panel_y - 2 * b1.rad
+        pygame.draw.circle(screen, BALL_COLOR, (int(b1.pos_x), int(b1.pos_y)), int(b1.diam))
+
+    # Draw Mouth
+        screen.blit(fg_image, [0, 0])
+
+    # Write score
+        score = myfont.render(str(score_start), False, (150, 50, 50))
+        screen.blit(score, score_pos)
+
+        key = pygame.key.get_pressed()
+        if key[K_BACKSPACE]:
+            main_game(b1, list_rasp,rasperry_image,score_start)
+
+        pygame.display.update()
+
+        for event in pygame.event.get():
+            if event.type==pygame.QUIT:
+                pygame.quit()
+                exit(0)
+            if event.type == KEYDOWN:
+                if event.key == K_ESCAPE:
+                    exit()
+                if event.key == K_q:
+                    exit()
+                if event.key == K_SPACE:
+                    menu()
+
+# saves new score in csv file
+def score(current_score):
+    score = float(current_score)
+    r = csv.reader(open('score_list.csv'))
+    lines = list(r)
+
+    if float(lines[1][1]) <= score:
+        for x in range(10, 1, -1):
+            lines[x][1] = lines[x - 1][1]
+        lines[1][1] = str(int(score))
+    elif float(lines[1][1]) > score:
+        for i in range(10, 1, -1):
+            if float(lines[i][1]) < score:
+                if float(lines[i - 1][1]) >= score:
+                    for x in range(10, i, -1):
+                        lines[x][1] = lines[x - 1][1]
+                    lines[i][1] = str(int(score))
+
+    writer = csv.writer(open('score_list.csv', 'w'))
+    writer.writerows(lines)
+
+# score menu to view top 10 highscores
+def highscore_menu():
+    screen.fill(pygame.Color(0, 0, 0))
+    re_image = pygame.image.load("image/score2.png").convert()
+    re_image = pygame.transform.scale(re_image, (800, 600))
+
+    screen.blit(re_image, [0, 0])
+    screen_r = screen.get_rect()
+
+    r = csv.reader(open('score_list.csv'))
+    lines = list(r)
+    lines_list = ["1.     "+str(lines[1][1]), " ", "2.     "+str(lines[2][1]), " ", "3.     "+str(lines[3][1]), " "
+                    , "4.     "+str(lines[4][1]), " ", "5.     "+str(lines[5][1]), " ", "6.     "+str(lines[6][1]), " "
+                    , "7.     "+str(lines[7][1]), " ", "8.     "+str(lines[8][1]), " ", "9.     "+str(lines[9][1]), " "
+                    , "10.    "+str(lines[10][1])]
+
+    font = pygame.font.SysFont('Lobster Two', 27)
+    texts = []
+
+    for i, line in enumerate(lines_list):
+        s = font.render(line, 1, (150, 30, 20))
+        r = s.get_rect(centerx=screen_r.centerx, y=150 + i * 17)
+        texts.append((r, s))
+
+    while True:
+        for e in pygame.event.get():
+            if e.type == QUIT or e.type == KEYDOWN and e.key == pygame.K_ESCAPE:
+                return
+
+        for r, s in texts:
+            screen.blit(s, r)
+
+        key = pygame.key.get_pressed()
+        if key[K_SPACE]:
+            menu()
+
+        pygame.display.update()
+        clock.tick(60)
+
+# main game function
+def main_game(b1, list_rasp,rasperry_image,score_start):
 # Background green
     bg_image = pygame.image.load("image/Background green only.png").convert()
     bg_image = pygame.transform.scale(bg_image, (800, 600))
@@ -237,8 +389,6 @@ def main_game(b1, list_rasp,rasperry_image):
     to_image.set_colorkey(transColor)
     to_image = pygame.transform.scale(to_image,(100,80))
 
-    global score_start
-
 # Time
     gametime = 0
 
@@ -249,7 +399,7 @@ def main_game(b1, list_rasp,rasperry_image):
         time_passed = round(gametime / 1000, 0) # save time in seconds (millisencondy times 1000)
 
     # Fill screen_ black
-        screen.blit(bg_image, [0, 0])
+        screen.blit(bg_image, [0,0])
 
     # Raspberries-Ball collision and fall
         # Check only for collision, if ball is under 320 pixel
@@ -270,7 +420,7 @@ def main_game(b1, list_rasp,rasperry_image):
 
         #Write time to check in developement
         time_game = myfont.render("Time:" + str(round(gametime / 1000, 0)), False, (50, 150, 50))
-        screen.blit(time_game, (500, 500))
+        #screen.blit(time_game, (500, 500))
 
         # for each rasp, check time and update image after specific time passing
         for i in list_rasp:
@@ -279,16 +429,13 @@ def main_game(b1, list_rasp,rasperry_image):
                 screen.blit(rasperry_image, [i.pos_x - 25, i.pos_y - 30])
             elif 10 < time_passed <= 20:
                 screen.blit(rasperry_image_2, [i.pos_x - 25, i.pos_y - 30])
-            elif 20 < time_passed <= 30:
+            elif 20 < time_passed <= 60:
                 screen.blit(rasperry_image_4, [i.pos_x - 25, i.pos_y - 30])
-            #elif 30 <= time_passed:        #Transfer to end -> would be overlayered by mouth
-            #    screen.fill((0,0,0))
-            #    restart()
 
     # Panel
         panel_move()
         #pygame.draw.rect(screen, PANEL_COLOR, (panel_x, panel_y, panel_width, panel_height), 0)
-        screen.blit(to_image,[panel_x-8,panel_y-5])
+        screen.blit(to_image, [panel_x-5, panel_y-5])
 
     # Ball: Draw and move ball via ball class function
         pygame.draw.circle(screen, BALL_COLOR, (int(b1.pos_x), int(b1.pos_y)), int(b1.diam))
@@ -298,17 +445,26 @@ def main_game(b1, list_rasp,rasperry_image):
         screen.blit(fg_image, [0, 0])
 
     # Write score
-        score = myfont.render("Score:" + str(score_start), False, (150, 50, 50))
+        score = myfont.render(str(score_start), False, (150, 50, 50))
         screen.blit(score, score_pos)
 
-    # End game if specific time is reached
-        if 30 <= time_passed:
-            restart()
-
-    # End game if ball is under the panel
-        if (b1.pos_y + b1.rad >= panel_y + b1.rad*20):
+    # End game if ball is under the panel or more than 30s passed; Win game if all list_rasp is empty
+    # score(score) --> saves reached score and might add it to the highscore list
+        if 80 <= time_passed:
+            current_score = score_start
             score_start = 0
-            restart()
+            restart(current_score)
+        elif not list_rasp:
+            #current_score = score_start
+            #score_start = 0
+            #winscreen(current_score)
+            time.sleep(0.1)
+            starting_next_level(score_start)
+        elif (b1.pos_y  >= panel_y + b1.rad + 10):
+            current_score = score_start
+            score_start = 0
+            restart(current_score)
+
 
     # Update frames each run through
         pygame.display.update()
@@ -324,13 +480,15 @@ def main_game(b1, list_rasp,rasperry_image):
             if event.type == KEYDOWN:
                 if event.key == K_q:
                     exit()
+                if event.key == K_SPACE:
+                    menu()
 
-
+# credit menu
 def credits():
     screen_r = screen.get_rect()
-    font = pygame.font.SysFont("Arial", 25) #FreeMono
+    font = pygame.font.SysFont('Lobster Two', 25, bold = True) #FreeMono
 
-    credit_list = [ "BERRY BUSTER", " "," ", "Developer - Rike & Jenny", " ","Developer - Rike & Jenny"
+    credit_list = [ "BERRY BUSTER", " "," ","Developer - Rike & Jenny"
                     ," ", "Lead Graphic Designer - Rike & Jenny", " ","Graphic Designer - Rike & Jenny"," "
                     , "Menu System - Rike & Jenny", " ", "Music - Rike & Jenny", " ", "Motion Designer - Rike & Jenny"
                     , " ", " ", "Special Thanks to friends :)"]
@@ -338,15 +496,15 @@ def credits():
     texts = []
     # Text rendering for efficiancy
 
-    green = pygame.image.load("image/Background green only.png").convert()
+    green = pygame.image.load("image/credits.png").convert()
     green = pygame.transform.scale(green, (800, 600))
 
     for i, line in enumerate(credit_list):
-        s = font.render(line, 1, (255, 10, 10))
+        s = font.render(line, 1, (150, 30, 20))
         # we also create a Rect for each Surface.
         # whenever you use rects with surfaces, it may be a good idea to use sprites instead
         # we give each rect the correct starting position
-        r = s.get_rect(centerx=screen_r.centerx, y=screen_r.bottom + i * 45)
+        r = s.get_rect(centerx=screen_r.centerx, y=screen_r.bottom + i * 30)
         texts.append((r, s))
 
     while True:
@@ -376,7 +534,21 @@ def credits():
         # cap framerate at 60 FPS
         clock.tick(60)
 
+# tutorial: instructions and how to play
+def tutorial():
+    # If X pressed -> next image with instruction
 
+    screen.fill(pygame.Color(0, 0, 0))                          # Fill background with black
+    re_image = pygame.image.load("image/green.png").convert() # Load Restart background
+    re_image = pygame.transform.scale(re_image, (800, 600))     # Transform image to fit in screen
+    screen.blit(re_image, [0, 0])                               # Draw image
+
+
+    key = pygame.key.get_pressed()                              # If Space gets pressed -> switch to menu
+    if key[K_SPACE]:
+        menu()
+
+# menu: let's player choose between main game, credit, scores and quit
 def menu():
     menu_image = pygame.image.load("image/menu.png").convert()
     menu_image = pygame.transform.scale(menu_image, (800, 600))
@@ -390,6 +562,9 @@ def menu():
 
         if key[K_c]:
             credits()
+
+        if key[K_r]:
+            highscore_menu()
 
         if key[K_q]:
             exit()
@@ -406,6 +581,7 @@ def menu():
                     exit()
 
 
-
 menu()
+
+
 
