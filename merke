@@ -2,6 +2,7 @@ git init
 git remote add origin
 
 git status
-git add %Verzeichnis%
-git commit -m ""
-git push origin %branch (master)
+ zeigt geänderte/hinzugefügte Dateien, müssen zur neuen Revision hinzugefügt werden mit:
+git add %Verzeichnis/ Datei%
+git commit -m "message mit Änderungen hier hin schreiben"
+git push origin %branch (bei uns jetzt master)
